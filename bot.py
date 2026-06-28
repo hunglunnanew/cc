@@ -181,21 +181,33 @@ async def dummy_web_server():
     print(f"Dummy web server started on port {port}")
 
 async def main():
-    await client.start()
-    print("Userbot started! Listening to Firebase...")
-    
-    from datetime import datetime, timezone
-    from google.cloud.firestore_v1.base_query import FieldFilter
-    now = datetime.now(timezone.utc)
-    # Listen to Firebase messages created after this exact moment
-    col_query = db.collection('messages').where(filter=FieldFilter('createdAt', '>=', now))
-    col_query.on_snapshot(on_snapshot)
-    
-    # Start Dummy Web Server for Render/Koyeb health checks
+    # Start Dummy Web Server FIRST so Render health checks pass immediately
     await dummy_web_server()
-    
-    # Keep running
-    await client.run_until_disconnected()
+
+    if not os.environ.get('TELEGRAM_SESSION_STRING'):
+        print("ERROR: TELEGRAM_SESSION_STRING is missing! Please add it in Render Environment Variables.")
+        # We don't exit so the web server stays alive to serve 502/200, but bot won't work
+        # To avoid blocking, we just return or wait
+        while True:
+            await asyncio.sleep(3600)
+
+    try:
+        await client.start()
+        print("Userbot started! Listening to Firebase...")
+        
+        from datetime import datetime, timezone
+        from google.cloud.firestore_v1.base_query import FieldFilter
+        now = datetime.now(timezone.utc)
+        # Listen to Firebase messages created after this exact moment
+        col_query = db.collection('messages').where(filter=FieldFilter('createdAt', '>=', now))
+        col_query.on_snapshot(on_snapshot)
+        
+        # Keep running
+        await client.run_until_disconnected()
+    except Exception as e:
+        print(f"Error starting Telegram Client: {e}")
+        while True:
+            await asyncio.sleep(3600)
 
 if __name__ == '__main__':
     with client:
