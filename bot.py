@@ -184,8 +184,11 @@ async def main():
     await client.start()
     print("Userbot started! Listening to Firebase...")
     
-    # Listen to Firebase messages
-    col_query = db.collection('messages').where('createdAt', '>=', firestore.SERVER_TIMESTAMP)
+    from datetime import datetime, timezone
+    from google.cloud.firestore_v1.base_query import FieldFilter
+    now = datetime.now(timezone.utc)
+    # Listen to Firebase messages created after this exact moment
+    col_query = db.collection('messages').where(filter=FieldFilter('createdAt', '>=', now))
     col_query.on_snapshot(on_snapshot)
     
     # Start Dummy Web Server for Render/Koyeb health checks
